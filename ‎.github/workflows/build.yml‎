@@ -1,0 +1,9 @@
+- name: Run tests
+        run: ./mvnw test -B
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/

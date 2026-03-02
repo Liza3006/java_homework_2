@@ -1,5 +1,6 @@
 package org.example.spring_hw.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.spring_hw.model.Task;
 import org.example.spring_hw.repository.TaskRepository;
 import org.example.spring_hw.service.scope.PrototypeScopedBean;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 /**
  * Сервис для работы с задачами
  */
+@Slf4j
 @Service
 public class TaskService {
 
@@ -33,16 +35,16 @@ public class TaskService {
 
   @PostConstruct
   public void initCache() {
-    System.out.println("=== @PostConstruct: инициализация кэша задач ===");
+    log.info("инициализация кэша задач");
     taskCache = taskRepository.findAll().stream()
       .collect(Collectors.toConcurrentMap(Task::getId, task -> task));
-    System.out.println("Кэш загружен, размер: " + taskCache.size());
+    log.info("Кэш загружен, размер: {}", taskCache.size());
   }
 
   @PreDestroy
   public void destroy() {
-    System.out.println("=== @PreDestroy: очистка ресурсов TaskService ===");
-    System.out.println("Размер кэша перед уничтожением: " + taskCache.size());
+    log.info("очистка ресурсов ");
+    log.info("Размер кэша перед уничтожением: {}", taskCache.size());
   }
 
   public List<Task> findAll() {
@@ -55,7 +57,7 @@ public class TaskService {
 
   public Task createTask(Task task) {
     String generatedId = prototypeBeanFactory.getObject().generateId();
-    System.out.println("Сгенерирован ID через prototype-бин: " + generatedId);
+    log.info("Сгенерирован ID: {}", generatedId);
     return taskRepository.save(task);
   }
 

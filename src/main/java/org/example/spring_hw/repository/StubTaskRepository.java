@@ -1,9 +1,11 @@
 package org.example.spring_hw.repository;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.spring_hw.model.Task;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 public class StubTaskRepository implements TaskRepository {
 
   private final List<Task> tasks = new ArrayList<>();
@@ -25,13 +27,13 @@ public class StubTaskRepository implements TaskRepository {
 
   @Override
   public Task save(Task task) {
-    //
+    log.warn("Сохранение задачи {}", task.getTitle());
     return task;
   }
 
   @Override
   public void deleteById(Long id) {
-    //
+    log.warn("Удаление задачи {}", id);
   }
 
   @Override

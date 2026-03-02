@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: Spring_hw
+  aop:
+    auto: true
+    proxy-target-class: true
+
+app:
+  name: "To-Do List MVP"
+  version: 1.0.0

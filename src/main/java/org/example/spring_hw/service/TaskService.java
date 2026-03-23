@@ -7,23 +7,20 @@ import org.example.spring_hw.service.scope.PrototypeScopedBean;
 import org.springframework.beans.factory.ObjectFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * Сервис для работы с задачами
- */
 @Slf4j
 @Service
 public class TaskService {
 
   private final TaskRepository taskRepository;
   private final ObjectFactory<PrototypeScopedBean> prototypeBeanFactory;
-
   private Map<Long, Task> taskCache = new ConcurrentHashMap<>();
 
   @Autowired
@@ -65,6 +62,19 @@ public class TaskService {
     if (!taskRepository.existsById(id)) {
       return null;
     }
+
+    Task existingTask = taskRepository.findById(id);
+
+    if (task.getDueDate() != null && existingTask.getCreatedAt() != null) {
+      LocalDate creationDate = existingTask.getCreatedAt().toLocalDate();
+      if (task.getDueDate().isBefore(creationDate)) {
+        log.warn("Invalid due date: {} is before creation date: {}", task.getDueDate(), creationDate);
+        throw new IllegalArgumentException(
+          "Due date (" + task.getDueDate() + ") cannot be before creation date (" + creationDate + ")"
+        );
+      }
+    }
+
     task.setId(id);
     return taskRepository.save(task);
   }

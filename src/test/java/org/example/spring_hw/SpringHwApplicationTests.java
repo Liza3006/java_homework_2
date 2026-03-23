@@ -1,13 +1,47 @@
 package org.example.spring_hw;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SpringHwApplicationTests {
+
+  @LocalServerPort
+  private int port;
+
+  @Autowired
+  private TestRestTemplate restTemplate;
 
   @Test
   void contextLoads() {
+    assertThat(restTemplate).isNotNull();
   }
 
+  @Test
+  void healthCheck_ShouldReturnOk() {
+    ResponseEntity<String> response = restTemplate.getForEntity(
+      "http://localhost:" + port + "/api/tasks", String.class);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Test
+  void swaggerUi_ShouldBeAccessible() {
+    ResponseEntity<String> response = restTemplate.getForEntity(
+      "http://localhost:" + port + "/swagger-ui.html", String.class);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
+
+  @Test
+  void openApiDocs_ShouldBeAccessible() {
+    ResponseEntity<String> response = restTemplate.getForEntity(
+      "http://localhost:" + port + "/v3/api-docs", String.class);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+  }
 }

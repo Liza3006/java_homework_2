@@ -1,111 +1,244 @@
 package org.example.spring_hw.controller;
 
-import org.example.spring_hw.model.Task;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.spring_hw.dto.TaskCreateDto;
+import org.example.spring_hw.dto.TaskResponseDto;
+import org.example.spring_hw.dto.TaskUpdateDto;
+import org.example.spring_hw.model.Priority;
+import org.example.spring_hw.service.TaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class TaskControllerTest {
+import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-  @LocalServerPort
-  private int port;
+@WebMvcTest(TaskController.class)
+class TaskControllerTest {
 
   @Autowired
-  private TestRestTemplate restTemplate;
+  private MockMvc mockMvc;
 
-  private String baseUrl;
+  @Autowired
+  private ObjectMapper objectMapper;
+
+  @MockBean
+  private TaskService taskService;
+
+  @MockBean
+  private org.example.spring_hw.mapper.TaskMapper taskMapper;
+
+  @MockBean
+  private org.example.spring_hw.service.scope.RequestScopedBean requestScopedBean;
+
+  private TaskResponseDto responseDto;
+  private TaskCreateDto createDto;
 
   @BeforeEach
   void setUp() {
-    baseUrl = "http://localhost:" + port + "/api/tasks";
+    createDto = new TaskCreateDto();
+    createDto.setTitle("Test Task");
+    createDto.setDescription("Test Description");
+    createDto.setDueDate(LocalDate.of(2026, 12, 31));
+    createDto.setPriority(Priority.HIGH);
+    createDto.setTags(Set.of("work"));
+
+    responseDto = TaskResponseDto.builder()
+      .id(1L)
+      .title("Test Task")
+      .description("Test Description")
+      .completed(false)
+      .createdAt(LocalDateTime.now())
+      .dueDate(LocalDate.of(2026, 12, 31))
+      .priority(Priority.HIGH)
+      .tags(Set.of("work"))
+      .build();
+
+    when(requestScopedBean.getRequestId()).thenReturn("test-id");
+    when(requestScopedBean.getStartTime()).thenReturn(LocalDateTime.now());
+  }
+
+  
+
+  @Test
+  void getAllTasks_ShouldReturnListOfTasks() throws Exception {
+    
+    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
+    when(taskService.findAll()).thenReturn(List.of(task));
+    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+
+    
+    mockMvc.perform(get("/api/tasks"))
+      .andExpect(status().isOk())
+      .andExpect(header().string("X-Total-Count", "1"))
+      .andExpect(header().string("X-API-Version", "2.0.0"))
+      .andExpect(jsonPath("$", hasSize(1)))
+      .andExpect(jsonPath("$[0].title").value("Test Task"));
   }
 
   @Test
-  void getAllTasks() {
-    ResponseEntity<Task[]> response = restTemplate.getForEntity(baseUrl, Task[].class);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody()).isNotNull();
+  void getTaskById_ExistingId_ShouldReturnTask() throws Exception {
+    
+    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
+    when(taskService.findById(1L)).thenReturn(task);
+    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+
+    
+    mockMvc.perform(get("/api/tasks/1"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.id").value(1L))
+      .andExpect(jsonPath("$.title").value("Test Task"));
   }
 
   @Test
-  void getTaskById_existingId() {
-    Task newTask = new Task(null, "Test", "Desc", false);
-    ResponseEntity<Task> createResponse = restTemplate.postForEntity(baseUrl, newTask, Task.class);
-    assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    Long id = createResponse.getBody().getId();
+  void createTask_ValidData_ShouldReturnCreatedTask() throws Exception {
+    
+    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
+    when(taskMapper.toEntity(any(TaskCreateDto.class))).thenReturn(task);
+    when(taskService.createTask(any())).thenReturn(task);
+    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
 
-    ResponseEntity<Task> getResponse = restTemplate.getForEntity(baseUrl + "/" + id, Task.class);
-    assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(getResponse.getBody().getTitle()).isEqualTo("Test");
+    
+    mockMvc.perform(post("/api/tasks")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createDto)))
+      .andExpect(status().isCreated())
+      .andExpect(header().string("X-API-Version", "2.0.0"))
+      .andExpect(jsonPath("$.id").value(1L))
+      .andExpect(jsonPath("$.title").value("Test Task"));
   }
 
   @Test
-  void getTaskById() {
-    ResponseEntity<Task> response = restTemplate.getForEntity(baseUrl + "/9999", Task.class);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  void updateTask_ExistingId_ShouldReturnUpdatedTask() throws Exception {
+    
+    org.example.spring_hw.model.Task existingTask = new org.example.spring_hw.model.Task();
+    when(taskService.findById(1L)).thenReturn(existingTask);
+    when(taskService.updateTask(eq(1L), any())).thenReturn(existingTask);
+    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+
+    TaskUpdateDto updateDto = new TaskUpdateDto();
+    updateDto.setTitle("Updated Task");
+    updateDto.setCompleted(true);
+
+    
+    mockMvc.perform(put("/api/tasks/1")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(updateDto)))
+      .andExpect(status().isOk())
+      .andExpect(header().string("X-API-Version", "2.0.0"))
+      .andExpect(jsonPath("$.title").value("Test Task"));
   }
 
   @Test
-  void createTask() {
-    Task newTask = new Task(null, "New Task", "Description", false);
-    ResponseEntity<Task> response = restTemplate.postForEntity(baseUrl, newTask, Task.class);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-    assertThat(response.getBody().getId()).isNotNull();
-    assertThat(response.getBody().getTitle()).isEqualTo("New Task");
+  void deleteTask_ExistingId_ShouldReturnNoContent() throws Exception {
+    
+    when(taskService.deleteTask(1L)).thenReturn(true);
+
+    
+    mockMvc.perform(delete("/api/tasks/1"))
+      .andExpect(status().isNoContent())
+      .andExpect(header().string("X-API-Version", "2.0.0"));
+  }
+
+  
+
+  @Test
+  void getTaskById_NonExistingId_ShouldReturnNotFound() throws Exception {
+    
+    when(taskService.findById(999L)).thenReturn(null);
+
+    
+    mockMvc.perform(get("/api/tasks/999"))
+      .andExpect(status().isNotFound());
   }
 
   @Test
-  void updateTask() {
-    Task newTask = new Task(null, "Original", "Desc", false);
-    ResponseEntity<Task> createResponse = restTemplate.postForEntity(baseUrl, newTask, Task.class);
-    Long id = createResponse.getBody().getId();
+  void createTask_InvalidTitle_ShouldReturnBadRequest() throws Exception {
+    
+    createDto.setTitle("12"); 
 
-    Task updatedTask = new Task(id, "Updated", "New Desc", true);
-    HttpEntity<Task> requestEntity = new HttpEntity<>(updatedTask);
-    ResponseEntity<Task> updateResponse = restTemplate.exchange(
-      baseUrl + "/" + id, HttpMethod.PUT, requestEntity, Task.class);
-    assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(updateResponse.getBody().getTitle()).isEqualTo("Updated");
-    assertThat(updateResponse.getBody().isCompleted()).isTrue();
+    
+    mockMvc.perform(post("/api/tasks")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createDto)))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.status").value(400))
+      .andExpect(jsonPath("$.error").value("Validation Failed"));
   }
 
   @Test
-  void updateTask_2() {
-    Task updatedTask = new Task(9999L, "Updated", "Desc", true);
-    HttpEntity<Task> requestEntity = new HttpEntity<>(updatedTask);
-    ResponseEntity<Task> response = restTemplate.exchange(
-      baseUrl + "/9999", HttpMethod.PUT, requestEntity, Task.class);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  void createTask_InvalidDueDate_ShouldReturnBadRequest() throws Exception {
+    
+    createDto.setDueDate(LocalDate.of(2020, 1, 1)); 
+
+    
+    mockMvc.perform(post("/api/tasks")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createDto)))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.status").value(400));
   }
 
   @Test
-  void deleteTask() {
-    Task newTask = new Task(null, "ToDelete", "Desc", false);
-    ResponseEntity<Task> createResponse = restTemplate.postForEntity(baseUrl, newTask, Task.class);
-    Long id = createResponse.getBody().getId();
+  void createTask_MissingPriority_ShouldReturnBadRequest() throws Exception {
+    
+    createDto.setPriority(null);
 
-    ResponseEntity<Void> deleteResponse = restTemplate.exchange(
-      baseUrl + "/" + id, HttpMethod.DELETE, null, Void.class);
-    assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-
-    ResponseEntity<Task> getResponse = restTemplate.getForEntity(baseUrl + "/" + id, Task.class);
-    assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    
+    mockMvc.perform(post("/api/tasks")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createDto)))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.status").value(400));
   }
 
   @Test
-  void deleteTask_2() {
-    ResponseEntity<Void> response = restTemplate.exchange(
-      baseUrl + "/9999", HttpMethod.DELETE, null, Void.class);
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+  void createTask_TooManyTags_ShouldReturnBadRequest() throws Exception {
+    
+    createDto.setTags(Set.of("1", "2", "3", "4", "5", "6")); 
+
+    
+    mockMvc.perform(post("/api/tasks")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(createDto)))
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  void updateTask_NonExistingId_ShouldReturnNotFound() throws Exception {
+    
+    when(taskService.findById(999L)).thenReturn(null);
+
+    TaskUpdateDto updateDto = new TaskUpdateDto();
+    updateDto.setTitle("Updated");
+
+    
+    mockMvc.perform(put("/api/tasks/999")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(objectMapper.writeValueAsString(updateDto)))
+      .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void deleteTask_NonExistingId_ShouldReturnNotFound() throws Exception {
+    
+    when(taskService.deleteTask(999L)).thenReturn(false);
+
+    
+    mockMvc.perform(delete("/api/tasks/999"))
+      .andExpect(status().isNotFound());
   }
 }

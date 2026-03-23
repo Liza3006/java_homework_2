@@ -7,7 +7,32 @@ spring:
   aop:
     auto: true
     proxy-target-class: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+      enabled: true
+  web:
+    resources:
+      add-mappings: false
 
 app:
   name: "To-Do List MVP"
-  version: 1.0.0
+  version: 2.0.0
+  upload-dir: ./uploads
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+
+logging:
+  level:
+    org.example.spring_hw: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate: DEBUG

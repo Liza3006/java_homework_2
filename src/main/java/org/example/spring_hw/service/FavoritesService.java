@@ -36,11 +36,20 @@ public class FavoritesService {
     if (!taskRepository.existsById(taskId)) {
       throw new TaskNotFoundException("Task not found: " + taskId);
     }
-    getFavoritesSet(session).add(taskId);
+    Set<Long> favorites = getFavoritesSet(session);
+    if (favorites.add(taskId)) {
+      session.setAttribute(FAVORITES_SESSION_KEY, favorites);
+    }
   }
 
   public void removeFromFavorites(Long taskId, HttpSession session) {
-    getFavoritesSet(session).remove(taskId);
+    if (!taskRepository.existsById(taskId)) {
+      throw new TaskNotFoundException("Task not found: " + taskId);
+    }
+    Set<Long> favorites = getFavoritesSet(session);
+    if (favorites.remove(taskId)) {
+      session.setAttribute(FAVORITES_SESSION_KEY, favorites);
+    }
   }
 
   public Set<Long> getFavoriteIds(HttpSession session) {

@@ -57,6 +57,9 @@ public class AttachmentService {
   }
 
   public AttachmentResponseDto storeAttachment(Long taskId, MultipartFile file) throws IOException {
+    if (file == null || file.isEmpty()) {
+      throw new IllegalArgumentException("File is empty");
+    }
     if (!taskRepository.existsById(taskId)) {
       throw new TaskNotFoundException("Task not found: " + taskId);
     }

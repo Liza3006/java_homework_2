@@ -1,41 +1,13 @@
 package org.example.spring_hw.repository;
 
 import org.example.spring_hw.model.TaskAttachment;
-import org.springframework.stereotype.Repository;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public class TaskAttachmentRepository {
+import java.util.List;
 
-  private final Map<Long, TaskAttachment> attachments = new ConcurrentHashMap<>();
-  private final AtomicLong counter = new AtomicLong(1);
+public interface TaskAttachmentRepository extends JpaRepository<TaskAttachment, Long> {
 
-  public TaskAttachment save(TaskAttachment attachment) {
-    if (attachment.getId() == null) {
-      attachment.setId(counter.getAndIncrement());
-    }
-    attachments.put(attachment.getId(), attachment);
-    return attachment;
-  }
-
-  public Optional<TaskAttachment> findById(Long id) {
-    return Optional.ofNullable(attachments.get(id));
-  }
-
-  public List<TaskAttachment> findByTaskId(Long taskId) {
-    return attachments.values().stream()
-      .filter(a -> a.getTaskId().equals(taskId))
-      .collect(Collectors.toList());
-  }
-
-  public void deleteById(Long id) {
-    attachments.remove(id);
-  }
-
-  public boolean existsById(Long id) {
-    return attachments.containsKey(id);
-  }
+  @EntityGraph(attributePaths = "task")
+  List<TaskAttachment> findByTaskId(Long taskId);
 }

@@ -29,4 +29,5 @@ public class TaskResponseDto {
 
   private Priority priority;
   private Set<String> tags;
+  private Set<AttachmentResponseDto> attachments;
 }

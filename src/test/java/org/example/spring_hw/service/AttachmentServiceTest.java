@@ -3,6 +3,8 @@ package org.example.spring_hw.service;
 import org.example.spring_hw.dto.AttachmentResponseDto;
 import org.example.spring_hw.exception.AttachmentNotFoundException;
 import org.example.spring_hw.exception.TaskNotFoundException;
+import org.example.spring_hw.model.Task;
+import org.example.spring_hw.model.Priority;
 import org.example.spring_hw.model.TaskAttachment;
 import org.example.spring_hw.repository.TaskAttachmentRepository;
 import org.example.spring_hw.repository.TaskRepository;
@@ -19,9 +21,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,6 +48,7 @@ class AttachmentServiceTest {
   Path tempDir;
 
   private TaskAttachment testAttachment;
+  private Task testTask;
   private MockMultipartFile testFile;
   private String storedFileName;
 
@@ -51,12 +56,15 @@ class AttachmentServiceTest {
   void setUp() {
     storedFileName = "test-uuid.txt";
 
+    testTask = new Task(1L, "Test Task", "Description", false,
+      LocalDateTime.now(), LocalDate.now().plusDays(1), Priority.HIGH, Set.of("work"));
+
     ReflectionTestUtils.setField(attachmentService, "uploadDir", tempDir.toString());
     ReflectionTestUtils.setField(attachmentService, "uploadPath", tempDir);
 
     testAttachment = TaskAttachment.builder()
       .id(1L)
-      .taskId(1L)
+      .task(testTask)
       .fileName("test.txt")
       .storedFileName(storedFileName)
       .contentType("text/plain")
@@ -74,8 +82,8 @@ class AttachmentServiceTest {
 
   @Test
   void storeAttachment_ValidTaskAndFile_ShouldSaveAndReturnDto() throws IOException {
-    
-    when(taskRepository.existsById(1L)).thenReturn(true);
+
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
     when(attachmentRepository.save(any(TaskAttachment.class))).thenAnswer(invocation -> {
       TaskAttachment saved = invocation.getArgument(0);
       saved.setId(1L);
@@ -160,8 +168,8 @@ class AttachmentServiceTest {
 
   @Test
   void storeAttachment_TaskNotFound_ShouldThrowTaskNotFoundException() {
-    
-    when(taskRepository.existsById(999L)).thenReturn(false);
+
+    when(taskRepository.findById(999L)).thenReturn(Optional.empty());
 
     
     assertThatThrownBy(() -> attachmentService.storeAttachment(999L, testFile))

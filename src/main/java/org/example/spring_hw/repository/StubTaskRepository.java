@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 @Slf4j
-public class StubTaskRepository implements TaskRepository {
+public class StubTaskRepository {
 
   private final List<Task> tasks = new ArrayList<>();
 
@@ -37,28 +37,23 @@ public class StubTaskRepository implements TaskRepository {
     ));
   }
 
-  @Override
   public List<Task> findAll() {
     return new ArrayList<>(tasks);
   }
 
-  @Override
   public Task findById(Long id) {
     return tasks.stream().filter(t -> t.getId().equals(id)).findFirst().orElse(null);
   }
 
-  @Override
   public Task save(Task task) {
     log.warn("Сохранение задачи {}", task.getTitle());
     return task;
   }
 
-  @Override
   public void deleteById(Long id) {
     log.warn("Удаление задачи {}", id);
   }
 
-  @Override
   public boolean existsById(Long id) {
     return tasks.stream().anyMatch(t -> t.getId().equals(id));
   }

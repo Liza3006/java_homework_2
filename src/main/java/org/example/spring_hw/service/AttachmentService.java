@@ -1,9 +1,11 @@
 package org.example.spring_hw.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.example.spring_hw.dto.AttachmentResponseDto;
 import org.example.spring_hw.exception.AttachmentNotFoundException;
 import org.example.spring_hw.exception.TaskNotFoundException;
+import org.example.spring_hw.model.Task;
 import org.example.spring_hw.model.TaskAttachment;
 import org.example.spring_hw.repository.TaskAttachmentRepository;
 import org.example.spring_hw.repository.TaskRepository;
@@ -12,9 +14,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -56,13 +59,13 @@ public class AttachmentService {
     }
   }
 
+  @Transactional(propagation = Propagation.REQUIRED, rollbackFor = IOException.class, readOnly = false)
   public AttachmentResponseDto storeAttachment(Long taskId, MultipartFile file) throws IOException {
     if (file == null || file.isEmpty()) {
       throw new IllegalArgumentException("File is empty");
     }
-    if (!taskRepository.existsById(taskId)) {
-      throw new TaskNotFoundException("Task not found: " + taskId);
-    }
+    Task task = taskRepository.findById(taskId)
+      .orElseThrow(() -> new TaskNotFoundException("Task not found: " + taskId));
 
     String originalFilename = file.getOriginalFilename();
     String extension = "";
@@ -75,10 +78,13 @@ public class AttachmentService {
 
     try (InputStream inputStream = file.getInputStream()) {
       Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+    } catch (IOException ex) {
+      Files.deleteIfExists(targetPath);
+      throw ex;
     }
 
     TaskAttachment attachment = TaskAttachment.builder()
-      .taskId(taskId)
+      .task(task)
       .fileName(originalFilename)
       .storedFileName(storedFileName)
       .contentType(file.getContentType())
@@ -86,11 +92,17 @@ public class AttachmentService {
       .uploadedAt(LocalDateTime.now())
       .build();
 
-    TaskAttachment saved = attachmentRepository.save(attachment);
+    TaskAttachment saved;
+    try {
+      saved = attachmentRepository.save(attachment);
+    } catch (RuntimeException ex) {
+      Files.deleteIfExists(targetPath);
+      throw ex;
+    }
 
     return AttachmentResponseDto.builder()
       .id(saved.getId())
-      .taskId(saved.getTaskId())
+      .taskId(saved.getTask().getId())
       .fileName(saved.getFileName())
       .size(saved.getSize())
       .uploadedAt(saved.getUploadedAt())
@@ -113,6 +125,7 @@ public class AttachmentService {
     return new UrlResource(filePath.toUri());
   }
 
+  @Transactional(propagation = Propagation.REQUIRED, rollbackFor = IOException.class, readOnly = false)
   public void deleteAttachment(Long attachmentId) throws IOException {
     TaskAttachment attachment = getAttachment(attachmentId);
     Path filePath = uploadPath.resolve(attachment.getStoredFileName());
@@ -122,6 +135,7 @@ public class AttachmentService {
     log.info("Deleted attachment: {}", attachmentId);
   }
 
+  @Transactional(readOnly = true)
   public List<AttachmentResponseDto> getAttachmentsByTaskId(Long taskId) {
     if (!taskRepository.existsById(taskId)) {
       throw new TaskNotFoundException("Task not found: " + taskId);
@@ -130,7 +144,7 @@ public class AttachmentService {
     return attachmentRepository.findByTaskId(taskId).stream()
       .map(a -> AttachmentResponseDto.builder()
         .id(a.getId())
-        .taskId(a.getTaskId())
+        .taskId(a.getTask().getId())
         .fileName(a.getFileName())
         .size(a.getSize())
         .uploadedAt(a.getUploadedAt())

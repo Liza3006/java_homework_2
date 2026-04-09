@@ -60,7 +60,7 @@ public class FavoritesService {
     Set<Long> favoriteIds = getFavoritesSet(session);
     return favoriteIds.stream()
       .map(taskRepository::findById)
-      .filter(Objects::nonNull)
+      .flatMap(Optional::stream)
       .collect(Collectors.toList());
   }
 }

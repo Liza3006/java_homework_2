@@ -1,5 +1,6 @@
 package org.example.spring_hw.service;
 
+import org.example.spring_hw.exception.BulkTaskCompletionException;
 import org.example.spring_hw.model.Priority;
 import org.example.spring_hw.model.Task;
 import org.example.spring_hw.repository.TaskRepository;
@@ -15,6 +16,7 @@ import org.springframework.beans.factory.ObjectFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,8 +72,18 @@ class TaskServiceTest {
   }
 
   @Test
+  void findAllWithAttachments_ShouldDelegateToRepository() {
+    when(taskRepository.findAllWithAttachments()).thenReturn(List.of(testTask));
+
+    List<Task> tasks = taskService.findAllWithAttachments();
+
+    assertThat(tasks).hasSize(1);
+    verify(taskRepository).findAllWithAttachments();
+  }
+
+  @Test
   void findById_ExistingId_ShouldReturnTask() {
-    when(taskRepository.findById(1L)).thenReturn(testTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
 
     Task task = taskService.findById(1L);
 
@@ -82,7 +94,7 @@ class TaskServiceTest {
 
   @Test
   void findById_NonExistingId_ShouldReturnNull() {
-    when(taskRepository.findById(999L)).thenReturn(null);
+    when(taskRepository.findById(999L)).thenReturn(Optional.empty());
 
     Task task = taskService.findById(999L);
 
@@ -106,7 +118,7 @@ class TaskServiceTest {
   @Test
   void updateTask_ExistingId_ShouldUpdateAndReturnTask() {
     when(taskRepository.existsById(1L)).thenReturn(true);
-    when(taskRepository.findById(1L)).thenReturn(existingTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(existingTask));
     when(taskRepository.save(any(Task.class))).thenReturn(testTask);
 
     Task updated = taskService.updateTask(1L, testTask);
@@ -145,10 +157,39 @@ class TaskServiceTest {
     verify(taskRepository, never()).deleteById(any());
   }
 
+  @Test
+  void bulkCompleteTasks_ShouldMarkAllFoundTasksCompleted() {
+    Task first = new Task(1L, "First", null, false, creationTime, LocalDate.now().plusDays(1), Priority.HIGH, Set.of("a"));
+    Task second = new Task(2L, "Second", null, false, creationTime, LocalDate.now().plusDays(2), Priority.LOW, Set.of("b"));
+
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(first));
+    when(taskRepository.findById(2L)).thenReturn(Optional.of(second));
+    when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    taskService.bulkCompleteTasks(List.of(1L, 2L));
+
+    assertThat(first.isCompleted()).isTrue();
+    assertThat(second.isCompleted()).isTrue();
+    verify(taskRepository, times(2)).save(any(Task.class));
+  }
+
+  @Test
+  void bulkCompleteTasks_WhenTaskMissing_ShouldThrowCustomException() {
+    Task first = new Task(1L, "First", null, false, creationTime, LocalDate.now().plusDays(1), Priority.HIGH, Set.of("a"));
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(first));
+    when(taskRepository.findById(999L)).thenReturn(Optional.empty());
+    when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    assertThatThrownBy(() -> taskService.bulkCompleteTasks(List.of(1L, 999L)))
+      .isInstanceOf(BulkTaskCompletionException.class)
+      .hasMessageContaining("Task not found: 999");
+
+    assertThat(first.isCompleted()).isTrue();
+    verify(taskRepository).save(first);
+  }
 
   @Test
   void updateTask_WithDueDateAfterCreation_ShouldUpdateSuccessfully() {
-    
     Task updateTask = new Task(
       1L, "Updated Task", "Description", false,
       creationTime, LocalDate.of(2026, 12, 31),
@@ -156,11 +197,11 @@ class TaskServiceTest {
     );
 
     when(taskRepository.existsById(1L)).thenReturn(true);
-    when(taskRepository.findById(1L)).thenReturn(existingTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(existingTask));
     when(taskRepository.save(any(Task.class))).thenReturn(updateTask);
 
     Task result = taskService.updateTask(1L, updateTask);
-    
+
     assertThat(result).isNotNull();
     assertThat(result.getDueDate()).isEqualTo(LocalDate.of(2026, 12, 31));
     verify(taskRepository).save(updateTask);
@@ -168,7 +209,6 @@ class TaskServiceTest {
 
   @Test
   void updateTask_WithDueDateEqualToCreation_ShouldUpdateSuccessfully() {
-    
     LocalDate dueDateEqualsCreation = existingTask.getCreatedAt().toLocalDate();
     Task updateTask = new Task(
       1L, "Updated Task", "Description", false,
@@ -177,11 +217,11 @@ class TaskServiceTest {
     );
 
     when(taskRepository.existsById(1L)).thenReturn(true);
-    when(taskRepository.findById(1L)).thenReturn(existingTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(existingTask));
     when(taskRepository.save(any(Task.class))).thenReturn(updateTask);
-    
+
     Task result = taskService.updateTask(1L, updateTask);
-    
+
     assertThat(result).isNotNull();
     assertThat(result.getDueDate()).isEqualTo(dueDateEqualsCreation);
     verify(taskRepository).save(updateTask);
@@ -189,7 +229,6 @@ class TaskServiceTest {
 
   @Test
   void updateTask_WithDueDateBeforeCreation_ShouldThrowIllegalArgumentException() {
-    
     LocalDate invalidDueDate = existingTask.getCreatedAt().toLocalDate().minusDays(1);
     Task updateTask = new Task(
       1L, "Updated Task", "Description", false,
@@ -198,8 +237,8 @@ class TaskServiceTest {
     );
 
     when(taskRepository.existsById(1L)).thenReturn(true);
-    when(taskRepository.findById(1L)).thenReturn(existingTask);
-    
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(existingTask));
+
     assertThatThrownBy(() -> taskService.updateTask(1L, updateTask))
       .isInstanceOf(IllegalArgumentException.class)
       .hasMessageContaining("Due date")
@@ -210,7 +249,6 @@ class TaskServiceTest {
 
   @Test
   void updateTask_WithNullDueDate_ShouldSkipValidation() {
-    
     Task updateTask = new Task(
       1L, "Updated Task", "Description", false,
       creationTime, null,
@@ -218,11 +256,11 @@ class TaskServiceTest {
     );
 
     when(taskRepository.existsById(1L)).thenReturn(true);
-    when(taskRepository.findById(1L)).thenReturn(existingTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(existingTask));
     when(taskRepository.save(any(Task.class))).thenReturn(updateTask);
 
     Task result = taskService.updateTask(1L, updateTask);
-    
+
     assertThat(result).isNotNull();
     assertThat(result.getDueDate()).isNull();
     verify(taskRepository).save(updateTask);
@@ -230,7 +268,6 @@ class TaskServiceTest {
 
   @Test
   void updateTask_WithDueDateButTaskNotFound_ShouldReturnNull() {
-    
     when(taskRepository.existsById(999L)).thenReturn(false);
 
     Task result = taskService.updateTask(999L, testTask);

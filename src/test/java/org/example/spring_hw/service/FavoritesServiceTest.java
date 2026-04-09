@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -133,12 +134,12 @@ class FavoritesServiceTest {
     
     Set<Long> favoriteIds = new HashSet<>(Set.of(1L, 2L));
     when(session.getAttribute(FAVORITES_SESSION_KEY)).thenReturn(favoriteIds);
-    when(taskRepository.findById(1L)).thenReturn(testTask);
+    when(taskRepository.findById(1L)).thenReturn(Optional.of(testTask));
 
     Task task2 = new Task(2L, "Task 2", "Desc", false,
       LocalDateTime.now(), LocalDate.of(2026, 12, 31),
       Priority.MEDIUM, Set.of());
-    when(taskRepository.findById(2L)).thenReturn(task2);
+    when(taskRepository.findById(2L)).thenReturn(Optional.of(task2));
 
     
     List<Task> result = favoritesService.getFavoriteTasks(session);

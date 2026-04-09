@@ -28,6 +28,18 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
   }
 
+  @ExceptionHandler(BulkTaskCompletionException.class)
+  public ResponseEntity<ErrorResponse> handleBulkTaskCompletion(BulkTaskCompletionException ex, WebRequest request) {
+    ErrorResponse error = ErrorResponse.builder()
+      .timestamp(Instant.now())
+      .status(HttpStatus.NOT_FOUND.value())
+      .error("Not Found")
+      .message(ex.getMessage())
+      .path(getPath(request))
+      .build();
+    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+  }
+
   @ExceptionHandler(AttachmentNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleAttachmentNotFound(AttachmentNotFoundException ex, WebRequest request) {
     ErrorResponse error = ErrorResponse.builder()

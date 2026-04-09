@@ -55,7 +55,7 @@ public class TaskController {
     System.out.println("RequestScopedBean ID: " + requestScopedBean.getRequestId() +
       ", start: " + requestScopedBean.getStartTime());
 
-    List<Task> tasks = taskService.findAll();
+    List<Task> tasks = taskService.findAllWithAttachments();
     List<TaskResponseDto> response = tasks.stream()
       .map(taskMapper::toResponseDto)
       .collect(Collectors.toList());

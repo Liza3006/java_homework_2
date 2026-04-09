@@ -2,18 +2,22 @@ package org.example.spring_hw.controller;
 
 import org.example.spring_hw.dto.AttachmentResponseDto;
 import org.example.spring_hw.exception.TaskNotFoundException;
+import org.example.spring_hw.model.Priority;
+import org.example.spring_hw.model.Task;
 import org.example.spring_hw.service.AttachmentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,6 +34,9 @@ class AttachmentControllerTest {
 
   @MockBean
   private AttachmentService attachmentService;
+
+  @MockBean
+  private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
   private AttachmentResponseDto responseDto;
 
@@ -71,6 +78,8 @@ class AttachmentControllerTest {
     
     org.example.spring_hw.model.TaskAttachment attachment = org.example.spring_hw.model.TaskAttachment.builder()
       .id(1L)
+      .task(new Task(1L, "Test Task", "Description", false,
+        LocalDateTime.now(), null, Priority.HIGH, Set.of("work")))
       .fileName("test.txt")
       .contentType("text/plain")
       .build();

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -43,6 +44,9 @@ class TaskControllerTest {
   @MockBean
   private org.example.spring_hw.service.scope.RequestScopedBean requestScopedBean;
 
+  @MockBean
+  private JpaMetamodelMappingContext jpaMetamodelMappingContext;
+
   private TaskResponseDto responseDto;
   private TaskCreateDto createDto;
 
@@ -70,16 +74,12 @@ class TaskControllerTest {
     when(requestScopedBean.getStartTime()).thenReturn(LocalDateTime.now());
   }
 
-  
-
   @Test
   void getAllTasks_ShouldReturnListOfTasks() throws Exception {
-    
     org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
-    when(taskService.findAll()).thenReturn(List.of(task));
+    when(taskService.findAllWithAttachments()).thenReturn(List.of(task));
     when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
 
-    
     mockMvc.perform(get("/api/tasks"))
       .andExpect(status().isOk())
       .andExpect(header().string("X-Total-Count", "1"))
@@ -90,12 +90,10 @@ class TaskControllerTest {
 
   @Test
   void getTaskById_ExistingId_ShouldReturnTask() throws Exception {
-    
     org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
     when(taskService.findById(1L)).thenReturn(task);
     when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
 
-    
     mockMvc.perform(get("/api/tasks/1"))
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.id").value(1L))
@@ -104,13 +102,11 @@ class TaskControllerTest {
 
   @Test
   void createTask_ValidData_ShouldReturnCreatedTask() throws Exception {
-    
     org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
     when(taskMapper.toEntity(any(TaskCreateDto.class))).thenReturn(task);
     when(taskService.createTask(any())).thenReturn(task);
     when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
 
-    
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createDto)))
@@ -122,7 +118,6 @@ class TaskControllerTest {
 
   @Test
   void updateTask_ExistingId_ShouldReturnUpdatedTask() throws Exception {
-    
     org.example.spring_hw.model.Task existingTask = new org.example.spring_hw.model.Task();
     when(taskService.findById(1L)).thenReturn(existingTask);
     when(taskService.updateTask(eq(1L), any())).thenReturn(existingTask);
@@ -132,7 +127,6 @@ class TaskControllerTest {
     updateDto.setTitle("Updated Task");
     updateDto.setCompleted(true);
 
-    
     mockMvc.perform(put("/api/tasks/1")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateDto)))
@@ -143,33 +137,25 @@ class TaskControllerTest {
 
   @Test
   void deleteTask_ExistingId_ShouldReturnNoContent() throws Exception {
-    
     when(taskService.deleteTask(1L)).thenReturn(true);
 
-    
     mockMvc.perform(delete("/api/tasks/1"))
       .andExpect(status().isNoContent())
       .andExpect(header().string("X-API-Version", "2.0.0"));
   }
 
-  
-
   @Test
   void getTaskById_NonExistingId_ShouldReturnNotFound() throws Exception {
-    
     when(taskService.findById(999L)).thenReturn(null);
 
-    
     mockMvc.perform(get("/api/tasks/999"))
       .andExpect(status().isNotFound());
   }
 
   @Test
   void createTask_InvalidTitle_ShouldReturnBadRequest() throws Exception {
-    
-    createDto.setTitle("12"); 
+    createDto.setTitle("12");
 
-    
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createDto)))
@@ -180,10 +166,8 @@ class TaskControllerTest {
 
   @Test
   void createTask_InvalidDueDate_ShouldReturnBadRequest() throws Exception {
-    
-    createDto.setDueDate(LocalDate.of(2020, 1, 1)); 
+    createDto.setDueDate(LocalDate.of(2020, 1, 1));
 
-    
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createDto)))
@@ -193,10 +177,8 @@ class TaskControllerTest {
 
   @Test
   void createTask_MissingPriority_ShouldReturnBadRequest() throws Exception {
-    
     createDto.setPriority(null);
 
-    
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createDto)))
@@ -206,10 +188,8 @@ class TaskControllerTest {
 
   @Test
   void createTask_TooManyTags_ShouldReturnBadRequest() throws Exception {
-    
-    createDto.setTags(Set.of("1", "2", "3", "4", "5", "6")); 
+    createDto.setTags(Set.of("1", "2", "3", "4", "5", "6"));
 
-    
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(createDto)))
@@ -219,13 +199,11 @@ class TaskControllerTest {
 
   @Test
   void updateTask_NonExistingId_ShouldReturnNotFound() throws Exception {
-    
     when(taskService.findById(999L)).thenReturn(null);
 
     TaskUpdateDto updateDto = new TaskUpdateDto();
     updateDto.setTitle("Updated");
 
-    
     mockMvc.perform(put("/api/tasks/999")
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(updateDto)))
@@ -234,10 +212,8 @@ class TaskControllerTest {
 
   @Test
   void deleteTask_NonExistingId_ShouldReturnNotFound() throws Exception {
-    
     when(taskService.deleteTask(999L)).thenReturn(false);
 
-    
     mockMvc.perform(delete("/api/tasks/999"))
       .andExpect(status().isNotFound());
   }

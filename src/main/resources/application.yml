@@ -2,8 +2,18 @@ server:
   port: 8080
 
 spring:
+  profiles:
+    default: dev
   application:
     name: Spring_hw
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
   aop:
     auto: true
     proxy-target-class: true

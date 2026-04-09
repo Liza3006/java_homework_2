@@ -1,0 +1,8 @@
+spring:
+  profiles:
+    active: test
+
+app:
+  name: "To-Do List MVP"
+  version: 2.0.0
+  upload-dir: ./uploads

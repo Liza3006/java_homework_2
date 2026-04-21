@@ -1,13 +1,38 @@
 server:
   port: 8080
 
-spring:
-  application:
-    name: Spring_hw
-  aop:
-    auto: true
-    proxy-target-class: true
-
 app:
-  name: "To-Do List MVP"
-  version: 1.0.0
+  security:
+    jwt-secret: "change-me-homework-secret-change-me-homework-secret"
+    jwt-ttl: 30m
+    password-pepper: "homework-pepper"
+  external-api:
+    base-url: "http://localhost:${server.port}"
+    connect-timeout: 500ms
+    read-timeout: 1s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      externalApi:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 2
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        ignoreExceptions:
+          - org.example.spring_hw.exception.TaskNotFoundException
+  ratelimiter:
+    instances:
+      externalApi:
+        limitForPeriod: 5
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0

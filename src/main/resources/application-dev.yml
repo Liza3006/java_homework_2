@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/spring_hw
-    username: ${DB_USERNAME:change-me}
-    password: ${DB_PASSWORD:change-me}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:h2:mem:spring_hw_dev;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
   jpa:
     hibernate:
       ddl-auto: validate

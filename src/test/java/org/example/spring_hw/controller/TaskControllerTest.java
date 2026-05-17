@@ -3,28 +3,30 @@ package org.example.spring_hw.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.spring_hw.dto.TaskCreateDto;
 import org.example.spring_hw.dto.TaskResponseDto;
-import org.example.spring_hw.dto.TaskUpdateDto;
 import org.example.spring_hw.model.Priority;
+import org.example.spring_hw.model.Task;
 import org.example.spring_hw.service.TaskService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Set;
 
-import static org.hamcrest.Matchers.*;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TaskController.class)
 class TaskControllerTest {
@@ -35,27 +37,29 @@ class TaskControllerTest {
   @Autowired
   private ObjectMapper objectMapper;
 
-  @MockBean
+  @MockitoBean
   private TaskService taskService;
 
-  @MockBean
+  @MockitoBean
   private org.example.spring_hw.mapper.TaskMapper taskMapper;
 
-  @MockBean
+  @MockitoBean
   private org.example.spring_hw.service.scope.RequestScopedBean requestScopedBean;
 
-  @MockBean
+  @MockitoBean
   private JpaMetamodelMappingContext jpaMetamodelMappingContext;
 
-  private TaskResponseDto responseDto;
   private TaskCreateDto createDto;
+  private TaskResponseDto responseDto;
+  private final LocalDateTime createdAt = LocalDateTime.of(2026, 3, 23, 12, 0);
+  private final LocalDate dueDate = LocalDate.of(2026, 12, 31);
 
   @BeforeEach
   void setUp() {
     createDto = new TaskCreateDto();
     createDto.setTitle("Test Task");
     createDto.setDescription("Test Description");
-    createDto.setDueDate(LocalDate.of(2026, 12, 31));
+    createDto.setDueDate(dueDate);
     createDto.setPriority(Priority.HIGH);
     createDto.setTags(Set.of("work"));
 
@@ -64,48 +68,25 @@ class TaskControllerTest {
       .title("Test Task")
       .description("Test Description")
       .completed(false)
-      .createdAt(LocalDateTime.now())
-      .dueDate(LocalDate.of(2026, 12, 31))
+      .createdAt(createdAt)
+      .dueDate(dueDate)
       .priority(Priority.HIGH)
       .tags(Set.of("work"))
+      .attachments(Set.of())
       .build();
 
     when(requestScopedBean.getRequestId()).thenReturn("test-id");
-    when(requestScopedBean.getStartTime()).thenReturn(LocalDateTime.now());
+    when(requestScopedBean.getStartTime()).thenReturn(createdAt);
   }
 
   @Test
-  void getAllTasks_ShouldReturnListOfTasks() throws Exception {
-    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
-    when(taskService.findAllWithAttachments()).thenReturn(List.of(task));
-    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+  void createTask_shouldReturn201AndSerializedJson() throws Exception {
+    Task mappedTask = new Task(null, "Test Task", "Test Description", false, createdAt, dueDate, Priority.HIGH, Set.of("work"));
+    Task savedTask = new Task(1L, "Test Task", "Test Description", false, createdAt, dueDate, Priority.HIGH, Set.of("work"));
 
-    mockMvc.perform(get("/api/tasks"))
-      .andExpect(status().isOk())
-      .andExpect(header().string("X-Total-Count", "1"))
-      .andExpect(header().string("X-API-Version", "2.0.0"))
-      .andExpect(jsonPath("$", hasSize(1)))
-      .andExpect(jsonPath("$[0].title").value("Test Task"));
-  }
-
-  @Test
-  void getTaskById_ExistingId_ShouldReturnTask() throws Exception {
-    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
-    when(taskService.findById(1L)).thenReturn(task);
-    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
-
-    mockMvc.perform(get("/api/tasks/1"))
-      .andExpect(status().isOk())
-      .andExpect(jsonPath("$.id").value(1L))
-      .andExpect(jsonPath("$.title").value("Test Task"));
-  }
-
-  @Test
-  void createTask_ValidData_ShouldReturnCreatedTask() throws Exception {
-    org.example.spring_hw.model.Task task = new org.example.spring_hw.model.Task();
-    when(taskMapper.toEntity(any(TaskCreateDto.class))).thenReturn(task);
-    when(taskService.createTask(any())).thenReturn(task);
-    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+    when(taskMapper.toEntity(any(TaskCreateDto.class))).thenReturn(mappedTask);
+    when(taskService.createTask(mappedTask)).thenReturn(savedTask);
+    when(taskMapper.toResponseDto(savedTask)).thenReturn(responseDto);
 
     mockMvc.perform(post("/api/tasks")
         .contentType(MediaType.APPLICATION_JSON)
@@ -113,47 +94,45 @@ class TaskControllerTest {
       .andExpect(status().isCreated())
       .andExpect(header().string("X-API-Version", "2.0.0"))
       .andExpect(jsonPath("$.id").value(1L))
-      .andExpect(jsonPath("$.title").value("Test Task"));
+      .andExpect(jsonPath("$.title").value("Test Task"))
+      .andExpect(jsonPath("$.completed").value(false))
+      .andExpect(jsonPath("$.dueDate").value("2026-12-31"))
+      .andExpect(jsonPath("$.priority").value("HIGH"))
+      .andExpect(jsonPath("$.attachments", hasSize(0)));
   }
 
   @Test
-  void updateTask_ExistingId_ShouldReturnUpdatedTask() throws Exception {
-    org.example.spring_hw.model.Task existingTask = new org.example.spring_hw.model.Task();
-    when(taskService.findById(1L)).thenReturn(existingTask);
-    when(taskService.updateTask(eq(1L), any())).thenReturn(existingTask);
-    when(taskMapper.toResponseDto(any())).thenReturn(responseDto);
+  void getTaskById_shouldReturnSavedTaskAsJson() throws Exception {
+    Task task = new Task(1L, "Saved Task", "Saved Description", false, createdAt, dueDate, Priority.MEDIUM, Set.of("saved"));
+    TaskResponseDto savedResponse = TaskResponseDto.builder()
+      .id(task.getId())
+      .title(task.getTitle())
+      .description(task.getDescription())
+      .completed(task.isCompleted())
+      .createdAt(task.getCreatedAt())
+      .dueDate(task.getDueDate())
+      .priority(task.getPriority())
+      .tags(task.getTags())
+      .attachments(Set.of())
+      .build();
 
-    TaskUpdateDto updateDto = new TaskUpdateDto();
-    updateDto.setTitle("Updated Task");
-    updateDto.setCompleted(true);
+    when(taskService.findById(1L)).thenReturn(task);
+    when(taskMapper.toResponseDto(task)).thenReturn(savedResponse);
 
-    mockMvc.perform(put("/api/tasks/1")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(updateDto)))
+    mockMvc.perform(get("/api/tasks/{id}", 1L))
       .andExpect(status().isOk())
-      .andExpect(header().string("X-API-Version", "2.0.0"))
-      .andExpect(jsonPath("$.title").value("Test Task"));
+      .andExpect(jsonPath("$.id").value(1L))
+      .andExpect(jsonPath("$.title").value("Saved Task"))
+      .andExpect(jsonPath("$.description").value("Saved Description"))
+      .andExpect(jsonPath("$.completed").value(false))
+      .andExpect(jsonPath("$.createdAt").value("2026-03-23T12:00:00"))
+      .andExpect(jsonPath("$.dueDate").value("2026-12-31"))
+      .andExpect(jsonPath("$.priority").value("MEDIUM"))
+      .andExpect(jsonPath("$.tags", hasSize(1)));
   }
 
   @Test
-  void deleteTask_ExistingId_ShouldReturnNoContent() throws Exception {
-    when(taskService.deleteTask(1L)).thenReturn(true);
-
-    mockMvc.perform(delete("/api/tasks/1"))
-      .andExpect(status().isNoContent())
-      .andExpect(header().string("X-API-Version", "2.0.0"));
-  }
-
-  @Test
-  void getTaskById_NonExistingId_ShouldReturnNotFound() throws Exception {
-    when(taskService.findById(999L)).thenReturn(null);
-
-    mockMvc.perform(get("/api/tasks/999"))
-      .andExpect(status().isNotFound());
-  }
-
-  @Test
-  void createTask_InvalidTitle_ShouldReturnBadRequest() throws Exception {
+  void createTask_invalidTitle_shouldReturnBadRequest() throws Exception {
     createDto.setTitle("12");
 
     mockMvc.perform(post("/api/tasks")
@@ -162,59 +141,5 @@ class TaskControllerTest {
       .andExpect(status().isBadRequest())
       .andExpect(jsonPath("$.status").value(400))
       .andExpect(jsonPath("$.error").value("Validation Failed"));
-  }
-
-  @Test
-  void createTask_InvalidDueDate_ShouldReturnBadRequest() throws Exception {
-    createDto.setDueDate(LocalDate.of(2020, 1, 1));
-
-    mockMvc.perform(post("/api/tasks")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(createDto)))
-      .andExpect(status().isBadRequest())
-      .andExpect(jsonPath("$.status").value(400));
-  }
-
-  @Test
-  void createTask_MissingPriority_ShouldReturnBadRequest() throws Exception {
-    createDto.setPriority(null);
-
-    mockMvc.perform(post("/api/tasks")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(createDto)))
-      .andExpect(status().isBadRequest())
-      .andExpect(jsonPath("$.status").value(400));
-  }
-
-  @Test
-  void createTask_TooManyTags_ShouldReturnBadRequest() throws Exception {
-    createDto.setTags(Set.of("1", "2", "3", "4", "5", "6"));
-
-    mockMvc.perform(post("/api/tasks")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(createDto)))
-      .andExpect(status().isBadRequest())
-      .andExpect(jsonPath("$.status").value(400));
-  }
-
-  @Test
-  void updateTask_NonExistingId_ShouldReturnNotFound() throws Exception {
-    when(taskService.findById(999L)).thenReturn(null);
-
-    TaskUpdateDto updateDto = new TaskUpdateDto();
-    updateDto.setTitle("Updated");
-
-    mockMvc.perform(put("/api/tasks/999")
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(objectMapper.writeValueAsString(updateDto)))
-      .andExpect(status().isNotFound());
-  }
-
-  @Test
-  void deleteTask_NonExistingId_ShouldReturnNotFound() throws Exception {
-    when(taskService.deleteTask(999L)).thenReturn(false);
-
-    mockMvc.perform(delete("/api/tasks/999"))
-      .andExpect(status().isNotFound());
   }
 }

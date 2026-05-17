@@ -19,7 +19,7 @@ public class TaskStatisticsService {
   private String appVersion;
 
   @Autowired
-  public TaskStatisticsService(TaskRepository primaryRepo,
+  public TaskStatisticsService(@Qualifier("taskRepository") TaskRepository primaryRepo,
                                @Qualifier("stubTaskRepository") TaskRepository stubRepo) {
     this.primaryRepo = primaryRepo;
     this.stubRepo = stubRepo;
